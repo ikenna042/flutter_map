@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_map_flutter/directions_model.dart';
+// import 'package:google_map_flutter/directions_repo.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 void main() {
@@ -33,6 +35,7 @@ class _MapScreenState extends State<MapScreen> {
   Completer<GoogleMapController> _googleMapController = Completer();
   Marker _origin;
   Marker _destination;
+  Directions _info;
 
   @override
   Widget build(BuildContext context) {
@@ -59,31 +62,67 @@ class _MapScreenState extends State<MapScreen> {
             ),
         ],
       ),
-      body: GoogleMap(
-        myLocationButtonEnabled: false,
-        zoomControlsEnabled: false,
-        initialCameraPosition: _initialCameraPosition,
-        onMapCreated: (GoogleMapController controller) =>
-            _googleMapController.complete(controller),
-        markers: {
-          if (_origin != null) _origin,
-          if (_destination != null) _destination
-        },
-        onLongPress: _addMarker,
-      ),
+      body: Stack(alignment: Alignment.center, children: [
+        GoogleMap(
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
+          initialCameraPosition: _initialCameraPosition,
+          onMapCreated: (GoogleMapController controller) =>
+              _googleMapController.complete(controller),
+          markers: {
+            if (_origin != null) _origin,
+            if (_destination != null) _destination
+          },
+          polylines: {
+            if (_info != null)
+              Polyline(
+                polylineId: const PolylineId('overview_polyline'),
+                color: Colors.red,
+                width: 5,
+                points: _info.polylinePoints
+                    .map((e) => LatLng(e.latitude, e.longitude))
+                    .toList(),
+              ),
+          },
+          onLongPress: _addMarker,
+        ),
+        if (_info != null)
+          Positioned(
+              top: 20.0,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
+                decoration: BoxDecoration(
+                    color: Colors.yellowAccent,
+                    borderRadius: BorderRadius.circular(20.0),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        offset: Offset(0, 2),
+                        blurRadius: 6.0,
+                      )
+                    ]),
+                child: Text(
+                  '${_info.totalDistance}, ${_info.totalDuration}',
+                  style: const TextStyle(
+                      fontSize: 18.0, fontWeight: FontWeight.w600),
+                ),
+              ))
+      ]),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
-        onPressed: _goToEnugwu,
+        onPressed: _goToCenter,
         child: const Icon(Icons.center_focus_strong),
       ),
     );
   }
 
-  Future<void> _goToEnugwu() async {
+  Future<void> _goToCenter() async {
     final GoogleMapController controller = await _googleMapController.future;
-    controller
-        .animateCamera(CameraUpdate.newCameraPosition(_initialCameraPosition));
+    controller.animateCamera(_info != null
+        ? CameraUpdate.newLatLngBounds(_info.bounds, 100.0)
+        : CameraUpdate.newCameraPosition(_initialCameraPosition));
   }
 
   Future<void> _goToOrigin() async {
@@ -108,6 +147,7 @@ class _MapScreenState extends State<MapScreen> {
                 BitmapDescriptor.hueGreen),
             position: pos);
         _destination = null;
+        _info = null;
       });
     } else {
       setState(() {
@@ -118,6 +158,10 @@ class _MapScreenState extends State<MapScreen> {
                 BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
             position: pos);
       });
+
+      // final directions = await DirectionsRepository()
+      //     .getDirections(origin: _origin.position, destination: pos);
+      // setState(() => _info = directions);
     }
   }
 }
